@@ -8,8 +8,7 @@ vSRX.plus.Deb.CFT
 This CFT is a single CFT that adds a debian linux host on trusted side of the vSRX. The debian host is added to the AWS security groups and is also part of the vSRX trusted zone.  All addressing is configured for the debian host in addition to default gateway to force traffic through the vSRX.  The Debain host can be accessed via a static NAT 2223 through the vSRX. Very similar in how you might open ports for a web server behind a firewall.  This can be used as a simple starting template for an edge design.
 ssh -i yourkey admin@vSRXAWSpubIP -p 2223
 
-arate stac.  
-The
+
 Mark Snyder
 Security Solutions Architect
 msnyder@juniper.net
