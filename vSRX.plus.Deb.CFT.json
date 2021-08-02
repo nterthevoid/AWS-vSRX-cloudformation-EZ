@@ -24,9 +24,9 @@
     },
     "Mappings" : {
        "RegionMap" : {
-         "us-east-1"       : {"srxbyol" : "ami-0665fcb24d58c88f4", "deb10" : "ami-09d246ada0ae2e13c", "srxappsec" : "ami-0e6ce12bca24834a6", },
-       }
-     },
+          "us-east-1"       : {"srxbyol" : "ami-0665fcb24d58c88f4", "deb10" : "ami-09d246ada0ae2e13c", "srxappsec" : "ami-0e6ce12bca24834a6"}
+        }
+    },
     "Resources": {
         "VPCDev": {
             "Type": "AWS::EC2::VPC",
@@ -58,23 +58,6 @@
                     "Ref": "VPCDev"
                           },
                 "CidrBlock": "10.0.1.0/24",
-                "AvailabilityZone" : {
-                  "Fn::Select" : [
-                    "0",
-                    {
-                      "Fn::GetAZs" : ""
-                    }
-                  ]
-                }
-            }
-        },
-        "Subnet2": {
-            "Type": "AWS::EC2::Subnet",
-            "Properties": {
-                "VpcId": {
-                    "Ref": "VPCDev"
-                          },
-                "CidrBlock": "10.0.2.0/24",
                 "AvailabilityZone" : {
                   "Fn::Select" : [
                     "0",
@@ -117,21 +100,6 @@
                     "SourceDestCheck" : "false"
                   }
         },
-        "vSRX1Eth2": {
-          "Type"  : "AWS::EC2::NetworkInterface",
-            "Properties": {
-              "PrivateIpAddress" : "10.0.2.11",
-                "SubnetId": {
-                  "Ref": "Subnet2"
-                    },
-                    "GroupSet" : [
-                      {
-                        "Ref":"SECG1"
-                      }
-                    ],
-                    "SourceDestCheck" : "false"
-              }
-        },
         "vSRX1Eth3": {
           "Type"  : "AWS::EC2::NetworkInterface",
             "Properties": {
@@ -150,9 +118,9 @@
         "Deb3Eth0": {
           "Type": "AWS::EC2::NetworkInterface",
             "Properties": {
-              "PrivateIpAddress" : "10.0.0.30",
+              "PrivateIpAddress" : "10.0.3.10",
               "SubnetId": {
-                "Ref": "Subnet0"
+                "Ref": "Subnet3"
                 },
               "GroupSet" : [
                   {
@@ -161,20 +129,6 @@
               ]
 
             }
-        },
-        "Deb3Eth1": {
-          "Type"  : "AWS::EC2::NetworkInterface",
-            "Properties": {
-              "PrivateIpAddress" : "10.0.3.10",
-                "SubnetId": {
-                  "Ref": "Subnet3"
-                    },
-                    "GroupSet" : [
-                      {
-                        "Ref":"SECG1"
-                      }
-                    ]
-                    }
         },
         "SECG0" : {
                   "Type" : "AWS::EC2::SecurityGroup",
@@ -439,17 +393,17 @@
                           "    }",
                           "}"
                   ]
-                ]
-              }
+                  ]
+                }
                 },
                 "Tags" : [
                   {
                     "Key" : "Name",
                     "Value" : "vSRX1"
-                  },
+                  }
                 ]
               },
-              "DependsOn" : "IGW",
+              "DependsOn" : "IGW"
         },
         "Deb3": {
             "Type": "AWS::EC2::Instance",
@@ -471,12 +425,6 @@
                         "Ref": "Deb3Eth0"
                       },
                     "DeviceIndex": "0"
-                      },
-                    {
-                    "NetworkInterfaceId": {
-                        "Ref": "Deb3Eth1"
-                      },
-                    "DeviceIndex": "1"
                       }
                 ],
                 "UserData" : {
@@ -484,14 +432,16 @@
                           "Fn::Join" : [ "", [
                                              "#!/bin/bash -xe\n",
                                              "\n",
-                                             "mkdir /home/admin/stage1\n"
+                                             "mkdir /home/admin/stage1\n",
+                                             "sudo route del default",
+                                             "sudo route add default gw 10.0.3.11"
                                             ]
                           ]
                       }
                 },
 
                 "Tags" : [
-                  {"Key" : "Name", "Value" : "DebianHost3"},
+                  {"Key" : "Name", "Value" : "DebianHost3"}
                 ]
             }
         },
@@ -541,14 +491,6 @@
             }
             }
         },
-        "RTblSN2": {
-          "Type" : "AWS::EC2::RouteTable",
-          "Properties" : {
-            "VpcId": {
-                "Ref": "VPCDev"
-            }
-            }
-        },
         "RTblSN3": {
           "Type" : "AWS::EC2::RouteTable",
           "Properties" : {
@@ -564,15 +506,6 @@
               "RouteTableId" : { "Ref" : "RTblSN0" },
               "DestinationCidrBlock" : "0.0.0.0/0",
               "GatewayId" : { "Ref" : "IGW" }
-           }
-        },
-        "RouteS3" : {
-           "Type" : "AWS::EC2::Route",
-           "DependsOn" : "IGW",
-           "Properties" : {
-             "RouteTableId" : { "Ref" : "RTblSN3" },
-             "DestinationCidrBlock" : "0.0.0.0/0",
-             "NetworkInterfaceId" : { "Ref" : "Deb3Eth1" }
            }
         },
         "SubnetAssRoute0" : {
@@ -597,14 +530,6 @@
               "NetworkInterfaceId" :  {"Ref" : "vSRX1Eth1"}
           }
         },
-        "ENI2vSRX1": {
-          "Type" : "AWS::EC2::NetworkInterfaceAttachment",
-            "Properties" : {
-              "DeviceIndex" : "2",
-              "InstanceId" :  {"Ref" : "vSRX1"},
-              "NetworkInterfaceId" :  {"Ref" : "vSRX1Eth2"}
-            }
-          },
         "ENI3vSRX1": {
           "Type" : "AWS::EC2::NetworkInterfaceAttachment",
             "Properties" : {
@@ -618,17 +543,8 @@
         "vSRX1Eth1" :{
           "Value": {"Ref" : "vSRX1Eth1"}
         },
-        "vSRX1Eth2" :{
-          "Value": {"Ref" : "vSRX1Eth2"}
-        },
         "Deb3Eth0" :{
           "Value": {"Ref" : "Deb3Eth0"}
-        },
-        "Deb3Eth1" :{
-          "Value": {"Ref" : "Deb3Eth1"}
-        },
-        "Deb3" :{
-        "Value": {"Ref" : "Deb3"}
-      }
+        }
     }
 }
