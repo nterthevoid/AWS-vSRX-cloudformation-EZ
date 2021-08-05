@@ -1,0 +1,171 @@
+system {
+    host-name vSRX1;
+    services {
+        ssh;
+    }
+}
+services {
+    application-identification {
+        download {
+            url https://services.netscreen.com/cgi-bin/index.cgi;
+            ignore-server-validation;
+        }
+    }
+}
+security {
+    log {
+        mode stream;
+        format sd-syslog;
+        report;
+    }
+    nat {
+        source {
+            rule-set nat-set {
+                from interface ge-0/0/1.0;
+                to interface ge-0/0/0.0;
+                rule nat-rule {
+                    match {
+                        source-address 0.0.0.0/0;
+                        destination-address 0.0.0.0/0;
+                    }
+                    then {
+                        source-nat {
+                            interface;
+                        }
+                    }
+                }
+            }
+        }
+        destination {
+            pool deb_ssh {
+                address 10.0.3.10/32 port 22;
+            }
+            rule-set rule_set_ssh {
+                from zone untrust;
+                rule ssh_rule {
+                    match {
+                        source-address 0.0.0.0/0;
+                        destination-address 10.0.1.11/32;
+                        destination-port {
+                            2322;
+                        }
+                    }
+                    then {
+                        destination-nat {
+                            pool {
+                                deb_ssh;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    policies {
+        from-zone trust to-zone untrust {
+            policy allow-all-out {
+                match {
+                    source-address any;
+                    destination-address any;
+                    application any;
+                }
+                then {
+                    permit;
+                    count;
+                }
+            }
+        }
+        from-zone untrust to-zone trust {
+            policy forwardssh {
+                match {
+                    source-address any;
+                    destination-address deb;
+                    application junos-ssh;
+                }
+                then {
+                    permit;
+                    count;
+                }
+            }
+        }
+    }
+    zones {
+        security-zone untrust {
+            address-book {
+                address deb2 10.0.2.87/32;
+            }
+            host-inbound-traffic {
+                system-services {
+                    ping;
+                    https;
+                    ssh;
+                }
+            }
+            interfaces {
+                ge-0/0/0.0;
+            }
+        }
+        security-zone trust {
+            address-book {
+                address deb 10.0.3.10/32;
+            }
+            host-inbound-traffic {
+                system-services {
+                    all;
+                }
+            }
+            interfaces {
+                ge-0/0/1.0;
+            }
+        }
+    }
+}
+interfaces {
+    ge-0/0/0 {
+        mtu 9192;
+        unit 0 {
+            family inet {
+                address 10.0.1.11/24;
+            }
+        }
+    }
+    ge-0/0/1 {
+        mtu 9192;
+        unit 0 {
+            family inet {
+                address 10.0.3.11/24;
+            }
+        }
+    }
+    fxp0 {
+        mtu 9192;
+        unit 0 {
+            family inet {
+                address 10.0.0.11/24;
+            }
+        }
+    }
+}
+routing-instances {
+    aws {
+        routing-options {
+            static {
+                route 0.0.0.0/0 next-hop 10.0.1.1;
+            }
+        }
+        interface ge-0/0/0.0;
+        interface ge-0/0/1.0;
+        instance-type virtual-router;
+    }
+}
+applications {
+    application 2322 {
+        protocol tcp;
+        destination-port 2322;
+    }
+}
+routing-options {
+    static {
+        route 0.0.0.0/0 next-hop 10.0.0.1;
+    }
+}
