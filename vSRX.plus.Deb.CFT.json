@@ -282,6 +282,30 @@
                           "                }",
                           "            }",
                           "        }",
+                          "        destination {",
+                          "            pool deb_ssh {",
+                          "                address 10.0.3.10/32 port 22;",
+                          "            }",
+                          "            rule-set rule_set_ssh {",
+                          "                from zone untrust;",
+                          "                rule ssh_rule {",
+                          "                    match {",
+                          "                        source-address 0.0.0.0/0;",
+                          "                        destination-address 10.0.1.11/32;",
+                          "                        destination-port {",
+                          "                            2322;",
+                          "                        }",
+                          "                    }",
+                          "                    then {",
+                          "                        destination-nat {",
+                          "                            pool {",
+                          "                                deb_ssh;",
+                          "                            }",
+                          "                        }",
+                          "                    }",
+                          "                }",
+                          "            }",
+                          "        }",
                           "    }",
                           "    policies {                          ",
                           "        from-zone trust to-zone untrust {",
@@ -297,12 +321,22 @@
                           "                }",
                           "            }",
                           "        }",
+                          "        from-zone untrust to-zone trust {",
+                          "            policy forwardssh {",
+                          "                match {",
+                          "                    source-address any;",
+                          "                    destination-address deb;",
+                          "                    application junos-ssh;",
+                          "                }",
+                          "                then {",
+                          "                    permit;",
+                          "                    count;",
+                          "                }",
+                          "            }",
+                          "        }",
                           "    }",
                           "    zones {",
                           "        security-zone untrust {",
-                          "            address-book {",
-                          "                address deb2 10.0.2.87/32;",
-                          "            }",
                           "            host-inbound-traffic {",
                           "                system-services {",
                           "                    ping;",
@@ -315,6 +349,9 @@
                           "            }",
                           "        }",
                           "        security-zone trust {",
+                          "            address-book {",
+                          "                address deb 10.0.3.`0`/32;",
+                          "            }",
                           "            host-inbound-traffic {",
                           "                system-services {",
                           "                    all;",
@@ -341,7 +378,7 @@
                           "            family inet {",
                           "                address 10.0.3.11/24;",
                           "            }",
-                          "        }",
+                          "        }                               ",
                           "    }",
                           "    fxp0 {",
                           "        mtu 9192;",
@@ -366,9 +403,7 @@
                           "}",
                           "applications {",
                           "    application 2322 {",
-                          "        application-protocol ignore;",
                           "        protocol tcp;",
-                          "        source-port 0-65535;",
                           "        destination-port 2322;",
                           "    }",
                           "}",
@@ -378,8 +413,8 @@
                           "    }",
                           "}"
                   ]
-                  ]
-                }
+                ]
+              }
                 },
                 "Tags" : [
                   {
@@ -418,8 +453,8 @@
                                              "#!/bin/bash -xe\n",
                                              "\n",
                                              "mkdir /home/admin/stage1\n",
-                                             "sudo route del default",
-                                             "sudo route add default gw 10.0.3.11"
+                                             "sudo route del default\n",
+                                             "sudo route add default gw 10.0.3.11\n"
                                             ]
                           ]
                       }
@@ -493,11 +528,27 @@
               "GatewayId" : { "Ref" : "IGW" }
            }
         },
+        "RouteS1" : {
+           "Type" : "AWS::EC2::Route",
+           "DependsOn" : "IGW",
+           "Properties" : {
+             "RouteTableId" : { "Ref" : "RTblSN1" },
+             "DestinationCidrBlock" : "0.0.0.0/0",
+             "GatewayId" : { "Ref" : "IGW" }
+           }
+        },
         "SubnetAssRoute0" : {
           "Type" : "AWS::EC2::SubnetRouteTableAssociation",
           "Properties" : {
               "RouteTableId" : {"Ref" : "RTblSN0"},
               "SubnetId" : {"Ref" : "Subnet0"}
+            }
+        },
+        "SubnetAssRoute1" : {
+          "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+          "Properties" : {
+              "RouteTableId" : {"Ref" : "RTblSN1"},
+              "SubnetId" : {"Ref" : "Subnet1"}
             }
         },
         "SubnetAssRoute3" : {
@@ -518,7 +569,7 @@
         "ENI3vSRX1": {
           "Type" : "AWS::EC2::NetworkInterfaceAttachment",
             "Properties" : {
-              "DeviceIndex" : "3",
+              "DeviceIndex" : "2",
               "InstanceId" :  {"Ref" : "vSRX1"},
               "NetworkInterfaceId" :  {"Ref" : "vSRX1Eth3"}
           }
