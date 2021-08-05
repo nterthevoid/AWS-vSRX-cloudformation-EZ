@@ -1,0 +1,421 @@
+ec2-user@srx-71H725# run show configuration                                                    
+## Last commit: 2021-07-27 17:25:35 UTC by ec2-user
+version 20.2R2.11;
+#junos-config
+groups {
+    aws-default {
+        system {
+            root-authentication {
+                encrypted-password *disabled*; ## SECRET-DATA
+            }
+            login {
+                user ec2-user {
+                    full-name juniper-aws-ec2-user;
+                    uid 100;
+                    class super-user;
+                    authentication {
+                        ssh-rsa "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC0ai/0vlqaOIReWC+YNxynzyyy65AhuWk621UlbUCoO5F3sVk6og1UwapeqL6hC+TRxOJ8V3rt8+mwVIxZvttH6L0QK8qH8CoiLbKhL2zcrDV8qqOBbwwdmrME+VzkehIaJw8KNxfgs0J9el4E0lvn5ppSHqTP0FW6WuLT+79ZX80TePWEdrvCQ4K8YEEPaNq17GQaNCOtmAEckP4VlDykXmJdQ6BEoCeV3XsbDQKRT0IKLS79VMLrcqxB1OQCl83XoMDsSvpzRA3JTQeZLNtPkdJ8XsT2lG+0/nkcM1uQFyOpsfPPJ8ob9HY3dIDWiOyOvg3HMsHOb4vASWzBkyWf jnprdemouser71H725labkey"; ## SECRET-DATA
+                    }
+                }
+            }
+            services {
+                ssh {
+                    no-passwords;
+                }
+                netconf {
+                    ssh;
+                }
+                web-management {
+                    https {
+                        system-generated-certificate;
+                    }
+                }
+            }
+            name-server {
+                8.8.8.8;
+            }
+            license {
+                autoupdate {
+                    url https://ae1.juniper.net/junos/key_retrieval;
+                }
+            }
+        }
+    }                                   
+}
+apply-groups aws-default;
+system {
+    host-name srx-71H725;
+    login {
+        user jnprdemouser71H725 {
+            uid 2000;
+            class super-user;
+            authentication {
+                encrypted-password "$1$2dP1sV5J$qTSEl6.cLFDJGxfrDV0tG."; ## SECRET-DATA
+            }
+        }
+    }
+    services {
+        ssh;
+    }
+    syslog {
+        file kmd-logs {
+            daemon info;
+            match KMD;
+        }
+    }
+}
+services {
+    application-identification {
+        download {
+            url https://services.netscreen.com/cgi-bin/index.cgi;
+            ignore-server-validation;
+        }
+    }
+}
+security {
+    log {
+        mode stream;
+        format sd-syslog;
+        report;
+    }
+    ike {
+        proposal ike-prop {
+            authentication-method pre-shared-keys;
+            dh-group group2;
+            authentication-algorithm sha-256;
+            encryption-algorithm aes-256-cbc;
+            lifetime-seconds 1800;
+        }
+        policy ike-policy-cfgr {
+            mode aggressive;
+            proposals ike-prop;
+            pre-shared-key ascii-text "$9$w32oGzF/9tOQFhSleW8GDjiP5n/C"; ## SECRET-DATA
+        }
+        gateway ike-gate-cfgr {
+            ike-policy ike-policy-cfgr;
+            address 3.130.125.107;
+            local-identity user-at-hostname "71H725-source@test.com";
+            remote-identity user-at-hostname "87E960-source@test.com";
+            external-interface ge-0/0/0;
+        }
+    }
+    ipsec {
+        policy ipsec-policy-cfgr {
+            perfect-forward-secrecy {
+                keys group1;
+            }
+        }
+        vpn ipsec-vpn-cfgr {
+            bind-interface st0.0;
+            ike {
+                gateway ike-gate-cfgr;
+                ipsec-policy ipsec-policy-cfgr;
+            }
+            establish-tunnels immediately;
+        }
+    }
+    nat {
+        source {
+            rule-set nat-set {
+                from interface [ ge-0/0/1.0 ge-0/0/2.0 ];
+                to interface ge-0/0/0.0;
+                rule nat-rule {
+                    match {
+                        source-address 0.0.0.0/0;
+                        destination-address 0.0.0.0/0;
+                    }
+                    then {
+                        source-nat {    
+                            interface;
+                        }
+                    }
+                }
+            }
+        }
+        destination {
+            pool ssh-forward {
+                routing-instance {
+                    aws;
+                }
+                address 10.0.3.126/32 port 2022;
+            }
+            pool http {
+                routing-instance {
+                    aws;
+                }
+                address 10.0.3.126/32 port 8080;
+            }
+            rule-set forward {
+                from interface ge-0/0/0.0;
+                rule http-forward {
+                    match {
+                        source-address 0.0.0.0/0;
+                        destination-address 10.0.2.229/32;
+                        destination-port {
+                            8080;
+                        }
+                    }
+                    then {
+                        destination-nat {
+                            pool {
+                                http;
+                            }
+                        }
+                    }
+                }
+                rule ssh-forward {
+                    match {
+                        source-address 0.0.0.0/0;
+                        destination-address 10.0.2.229/32;
+                        destination-port {
+                            2022;
+                        }
+                    }
+                    then {
+                        destination-nat {
+                            pool {
+                                ssh-forward;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        static {
+            rule-set static-srs1 {
+                from zone vpn-zone;
+                rule r1 {
+                    match {
+                        destination-address 192.168.3.10/32;
+                    }
+                    then {
+                        static-nat {
+                            prefix {
+                                10.0.3.10/32;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        proxy-arp {
+            interface st0.0 {
+                address {
+                    192.168.3.10/32;
+                }
+            }
+        }
+    }
+    policies {
+        from-zone West to-zone untrust {
+            policy allow-all-out {
+                match {
+                    source-address any; 
+                    destination-address any;
+                    application any;
+                }
+                then {
+                    permit;
+                    count;
+                }
+            }
+        }
+        from-zone East to-zone untrust {
+            policy allow-all-out {
+                match {
+                    source-address any;
+                    destination-address any;
+                    application any;
+                }
+                then {
+                    permit;
+                    count;
+                }
+            }
+        }
+        from-zone East to-zone vpn-zone {
+            policy trust-vpn-zone-cfgr {
+                match {
+                    source-address Host-3;
+                    destination-address any;
+                    application any;
+                }
+                then {
+                    permit;
+                }
+            }
+        }
+        from-zone West to-zone vpn-zone {
+            policy trust-vpn-zone-cfgr {
+                match {
+                    source-address Host-2;
+                    destination-address remote-net-snat1-192.168.0.0--16;
+                    application any;
+                }
+                then {
+                    permit;
+                }
+            }
+        }
+        from-zone vpn-zone to-zone East {
+            policy vpn-zone-trust-cfgr {
+                match {
+                    source-address any;
+                    destination-address Host-3;
+                    application any;
+                }
+                then {
+                    permit;
+                }
+            }
+        }
+        from-zone vpn-zone to-zone West {
+            policy vpn-zone-trust-cfgr {
+                match {
+                    source-address remote-net-snat1-192.168.0.0--16;
+                    destination-address Host-2;
+                    application any;
+                }
+                then {
+                    permit;
+                }
+            }
+        }
+    }
+    zones {
+        security-zone untrust {
+            address-book {
+                address deb2 10.0.2.87/32;
+            }
+            host-inbound-traffic {
+                system-services {
+                    ping;
+                    https;
+                    ssh;
+                    ike;
+                }
+            }
+            interfaces {                
+                ge-0/0/0.0;
+            }
+        }
+        security-zone East {
+            address-book {
+                address Host-3 10.0.3.10/32;
+            }
+            host-inbound-traffic {
+                system-services {
+                    all;
+                }
+            }
+            interfaces {
+                ge-0/0/2.0;
+            }
+        }
+        security-zone West {
+            address-book {
+                address Host-2 10.0.2.10/32;
+            }
+            host-inbound-traffic {
+                system-services {
+                    all;
+                }
+            }
+            interfaces {
+                ge-0/0/1.0;
+            }
+        }
+        security-zone vpn-zone {
+            address-book {
+                address remote-net-snat1-192.168.0.0--16 192.168.0.0/16;
+            }
+            host-inbound-traffic {
+                system-services {
+                    all;
+                }
+            }
+            interfaces {
+                st0.0;
+            }
+        }
+    }
+}
+interfaces {
+    ge-0/0/0 {
+        mtu 9192;
+        unit 0 {
+            family inet {
+                address 10.0.1.11/24;
+            }
+        }
+    }
+    ge-0/0/1 {
+        mtu 9192;
+        unit 0 {
+            family inet {
+                address 10.0.2.11/24;
+            }
+        }
+    }
+    ge-0/0/2 {
+        mtu 9192;
+        unit 0 {
+            family inet {
+                address 10.0.3.11/24;
+            }
+        }
+    }
+    fxp0 {
+        mtu 9192;
+        unit 0 {
+            family inet {
+                address 10.0.0.11/24;
+            }
+        }
+    }
+    st0 {
+        unit 0 {
+            family inet {
+                address 52.70.177.129/32;
+                address 10.0.250.10/24;
+            }
+        }
+    }                                   
+}
+routing-instances {
+    aws {
+        routing-options {
+            static {
+                route 0.0.0.0/0 next-hop 10.0.1.1;
+                route 192.168.0.0/16 next-hop st0.0;
+            }
+        }
+        interface ge-0/0/0.0;
+        interface ge-0/0/1.0;
+        interface ge-0/0/2.0;
+        interface st0.0;
+        instance-type virtual-router;
+    }
+}
+applications {
+    application 2022 {
+        application-protocol ignore;
+        protocol tcp;
+        source-port 0-65535;
+        destination-port 2022;
+    }
+    application 8080 {
+        application-protocol ignore;
+        protocol tcp;
+        source-port 0-65535;
+        destination-port 8080;
+    }
+}
+routing-options {
+    static {
+        route 0.0.0.0/0 next-hop 10.0.0.1;
+    }
+}
+
+[edit]
+ec2-user@srx-71H725# 
