@@ -24,7 +24,7 @@
     },
     "Mappings" : {
        "RegionMap" : {
-          "us-east-1"       : {"srxbyol" : "ami-0665fcb24d58c88f4", "deb10" : "ami-09d246ada0ae2e13c", "srxappsec" : "ami-0e6ce12bca24834a6"}
+          "us-east-1"       : {"srxbyol" : "ami-0665fcb24d58c88f4", "deb10" : "ami-09d246ada0ae2e13c", "consec" : "ami-0e6ce12bca24834a6"}
         }
     },
     "Resources": {
@@ -187,7 +187,7 @@
         "vSRX1": {
             "Type": "AWS::EC2::Instance",
             "Properties": {
-              "ImageId" : { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "srxappsec"]},
+              "ImageId" : { "Fn::FindInMap" : [ "RegionMap", { "Ref" : "AWS::Region" }, "srxbyol"]},
                 "KeyName": {"Ref": "PubKey"},
                 "AvailabilityZone" : {
                   "Fn::Select" : [
